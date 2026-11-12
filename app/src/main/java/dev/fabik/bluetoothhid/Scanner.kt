@@ -345,13 +345,28 @@ fun Scanner(
                 .padding(if (fullScreen) PaddingValues(0.dp) else padding)
                 .fillMaxSize()
         ) {
-            RequiresCameraPermission {
-                CameraPreviewArea(onCameraReady = { control, info, capt ->
-                    cameraControl = control; cameraInfo = info
-                }) { result, send ->
-                    currentResult = result
-                    if (send && result?.text?.isNotEmpty() == true) {
-                        currentSendText()
+            val extInputEnabled by context.getPreferenceState(PreferenceStore.ENABLE_EXTERNAL_INPUT)
+            val extDisableCamera by context.getPreferenceState(PreferenceStore.EXT_INPUT_DISABLE_CAMERA)
+
+            if (extInputEnabled == true && extDisableCamera == true) {
+                // Hardware scanner only: keep the camera free for the device's scan engine.
+                Text(
+                    stringResource(R.string.ext_input_camera_disabled_hint),
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(32.dp)
+                )
+            } else {
+                RequiresCameraPermission {
+                    CameraPreviewArea(onCameraReady = { control, info, capt ->
+                        cameraControl = control; cameraInfo = info
+                    }) { result, send ->
+                        currentResult = result
+                        if (send && result?.text?.isNotEmpty() == true) {
+                            currentSendText()
+                        }
                     }
                 }
             }

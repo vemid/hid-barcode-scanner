@@ -321,6 +321,10 @@ open class PreferenceStore {
         // Additional broadcast action to listen on (e.g. a PDA's built-in scanner service).
         // The app's own EXTERNAL_INPUT action is always registered as well.
         val EXT_INPUT_ACTION = stringPreferencesKey("ext_input_action") defaultsTo ""
+        // Don't open the camera on the scanner screen. Needed on PDAs whose built-in scan
+        // engine can't start while another app holds the camera (e.g. Sunmi L3).
+        val EXT_INPUT_DISABLE_CAMERA =
+            booleanPreferencesKey("ext_input_disable_camera") defaultsTo false
 
         val DEVELOPER_MODE = booleanPreferencesKey("developer_mode") defaultsTo BuildConfig.DEBUG
         val OCR_COMPAT = booleanPreferencesKey("ocr_compat") defaultsTo false

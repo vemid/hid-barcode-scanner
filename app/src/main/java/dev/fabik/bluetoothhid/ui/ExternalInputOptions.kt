@@ -138,6 +138,11 @@ private fun ExternalInputOptionsContent() {
 
         ScannerPresetRow()
 
+        AdvancedToggleOption(
+            stringResource(R.string.ext_input_disable_camera),
+            PreferenceStore.EXT_INPUT_DISABLE_CAMERA
+        )
+
         Text(
             stringResource(R.string.ext_input_extra_desc),
             style = MaterialTheme.typography.bodyMedium
@@ -175,6 +180,11 @@ private fun ExternalInputHeader() {
                         PreferenceStore.EXT_INPUT_KEY_TYPE,
                         PreferenceStore.EXT_INPUT_KEY_SOURCE,
                         PreferenceStore.EXT_INPUT_ACTION,
+                    ).forEach {
+                        context.setPreference(it, it.defaultValue)
+                    }
+                    arrayOf(
+                        PreferenceStore.EXT_INPUT_DISABLE_CAMERA,
                     ).forEach {
                         context.setPreference(it, it.defaultValue)
                     }
@@ -216,6 +226,7 @@ private fun ScannerPresetRow() {
                         context.setPreference(PreferenceStore.EXT_INPUT_KEY_TYPE, preset.typeKey)
                         context.setPreference(PreferenceStore.EXT_INPUT_KEY_SOURCE, preset.sourceKey)
                         context.setPreference(PreferenceStore.ENABLE_EXTERNAL_INPUT, true)
+                        context.setPreference(PreferenceStore.EXT_INPUT_DISABLE_CAMERA, true)
                     }
                 },
                 label = { Text(preset.name) }
