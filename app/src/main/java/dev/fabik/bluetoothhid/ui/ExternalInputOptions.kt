@@ -16,6 +16,8 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Restore
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -47,6 +49,27 @@ import dev.fabik.bluetoothhid.utils.setPreference
 import kotlinx.coroutines.runBlocking
 
 const val EXTERNAL_INPUT_INTENT_ACTION = "dev.fabik.bluetoothhid.action.EXTERNAL_INPUT"
+
+/**
+ * Presets for Android PDAs with a built-in scan engine that publish results as a broadcast
+ * with a fixed action. Selecting one fills in the action and the extra keys.
+ */
+private data class ScannerPreset(
+    val name: String,
+    val action: String,
+    val valueKey: String,
+    val typeKey: String = "",
+    val sourceKey: String = "",
+)
+
+private val SCANNER_PRESETS = listOf(
+    // Sunmi (L2/L2s/L3, ...): Settings -> Scanner -> output mode "Broadcast output"
+    ScannerPreset(
+        name = "Sunmi",
+        action = "com.sunmi.scanner.ACTION_DATA_CODE_RECEIVED",
+        valueKey = "data",
+    ),
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -104,6 +127,18 @@ private fun ExternalInputOptionsContent() {
         )
 
         Text(
+            stringResource(R.string.ext_input_action_desc),
+            style = MaterialTheme.typography.bodyMedium
+        )
+
+        AdvancedTextField(
+            stringResource(R.string.ext_input_action),
+            PreferenceStore.EXT_INPUT_ACTION
+        ) { it.toString().trim() }
+
+        ScannerPresetRow()
+
+        Text(
             stringResource(R.string.ext_input_extra_desc),
             style = MaterialTheme.typography.bodyMedium
         )
@@ -139,6 +174,7 @@ private fun ExternalInputHeader() {
                         PreferenceStore.EXT_INPUT_KEY_VALUE,
                         PreferenceStore.EXT_INPUT_KEY_TYPE,
                         PreferenceStore.EXT_INPUT_KEY_SOURCE,
+                        PreferenceStore.EXT_INPUT_ACTION,
                     ).forEach {
                         context.setPreference(it, it.defaultValue)
                     }
@@ -159,11 +195,42 @@ private fun ExternalInputHeader() {
 }
 
 @Composable
+private fun ScannerPresetRow() {
+    val context = LocalContext.current
+
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            stringResource(R.string.ext_input_presets),
+            style = MaterialTheme.typography.bodyMedium
+        )
+        SCANNER_PRESETS.forEach { preset ->
+            AssistChip(
+                onClick = {
+                    runBlocking {
+                        context.setPreference(PreferenceStore.EXT_INPUT_ACTION, preset.action)
+                        context.setPreference(PreferenceStore.EXT_INPUT_KEY_VALUE, preset.valueKey)
+                        context.setPreference(PreferenceStore.EXT_INPUT_KEY_TYPE, preset.typeKey)
+                        context.setPreference(PreferenceStore.EXT_INPUT_KEY_SOURCE, preset.sourceKey)
+                        context.setPreference(PreferenceStore.ENABLE_EXTERNAL_INPUT, true)
+                    }
+                },
+                label = { Text(preset.name) }
+            )
+        }
+    }
+}
+
+@Composable
 fun ExternalInputReceiver(onReceive: (value: String, format: String?, source: String?) -> Unit) {
     val context = LocalContext.current
     val currentOnReceive by rememberUpdatedState(onReceive)
 
     val enabled by context.getPreferenceState(PreferenceStore.ENABLE_EXTERNAL_INPUT)
+    val customAction by context.getPreferenceState(PreferenceStore.EXT_INPUT_ACTION)
     val prefs by context.getMultiPreferenceState(
         PreferenceStore.EXT_INPUT_KEY_VALUE,
         PreferenceStore.EXT_INPUT_KEY_TYPE,
@@ -172,7 +239,7 @@ fun ExternalInputReceiver(onReceive: (value: String, format: String?, source: St
     val currentPrefs by rememberUpdatedState(prefs)
 
     if (enabled == true) {
-        DisposableEffect(context, currentOnReceive) {
+        DisposableEffect(context, currentOnReceive, customAction) {
             val receiver = object : BroadcastReceiver() {
                 override fun onReceive(context: Context, intent: Intent) {
                     val valueKey =
@@ -182,9 +249,13 @@ fun ExternalInputReceiver(onReceive: (value: String, format: String?, source: St
                     val sourceKey =
                         PreferenceStore.EXT_INPUT_KEY_SOURCE.extract(currentPrefs ?: return)
 
-                    val value = intent.getStringExtra(valueKey) ?: return
-                    val format = intent.getStringExtra(typeKey)
-                    val source = intent.getStringExtra(sourceKey)
+                    // PDA scan services usually append the configured end character (CR/LF);
+                    // strip it so the app's own template/suffix settings decide what is sent.
+                    val value = intent.getStringExtra(valueKey)
+                        ?.trimEnd('\r', '\n')
+                        ?.ifEmpty { null } ?: return
+                    val format = typeKey.takeIf { it.isNotBlank() }?.let { intent.getStringExtra(it) }
+                    val source = sourceKey.takeIf { it.isNotBlank() }?.let { intent.getStringExtra(it) }
 
                     Log.d("ExternalInput", "External input received: $value, $format, $source")
                     currentOnReceive(value, format, source)
@@ -194,11 +265,15 @@ fun ExternalInputReceiver(onReceive: (value: String, format: String?, source: St
             ContextCompat.registerReceiver(
                 context,
                 receiver,
-                IntentFilter(EXTERNAL_INPUT_INTENT_ACTION),
+                IntentFilter(EXTERNAL_INPUT_INTENT_ACTION).apply {
+                    customAction?.takeIf {
+                        it.isNotBlank() && it != EXTERNAL_INPUT_INTENT_ACTION
+                    }?.let { addAction(it) }
+                },
                 ContextCompat.RECEIVER_EXPORTED
             )
 
-            Log.d("ExternalInput", "Receiver registered")
+            Log.d("ExternalInput", "Receiver registered (extra action: $customAction)")
 
             onDispose {
                 Log.d("ExternalInput", "Receiver unregistered")

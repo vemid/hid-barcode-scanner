@@ -318,6 +318,9 @@ open class PreferenceStore {
         val EXT_INPUT_KEY_VALUE = stringPreferencesKey("ext_input_key_value") defaultsTo ""
         val EXT_INPUT_KEY_TYPE = stringPreferencesKey("ext_input_key_type") defaultsTo ""
         val EXT_INPUT_KEY_SOURCE = stringPreferencesKey("ext_input_key_source") defaultsTo ""
+        // Additional broadcast action to listen on (e.g. a PDA's built-in scanner service).
+        // The app's own EXTERNAL_INPUT action is always registered as well.
+        val EXT_INPUT_ACTION = stringPreferencesKey("ext_input_action") defaultsTo ""
 
         val DEVELOPER_MODE = booleanPreferencesKey("developer_mode") defaultsTo BuildConfig.DEBUG
         val OCR_COMPAT = booleanPreferencesKey("ocr_compat") defaultsTo false
